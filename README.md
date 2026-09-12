@@ -156,7 +156,8 @@ docker compose logs -f app | grep '"event"'
 
 | Metric | Meaning |
 |---|---|
-| `http_server_requests_seconds_*` | Request rate, latency histogram (p50/p95/p99), error rate by status |
+| `http_server_requests_seconds{quantile="0.99"}` | p99 latency, published per endpoint (also p50 and p95) |
+| `http_server_requests_seconds_count` / `_sum` | Request rate and total time, labelled by `uri`, `method`, `status`, `outcome` |
 | `wallet_transfers_completed_total` | Transfers that moved money |
 | `wallet_transfers_declined_total{reason="insufficient_funds"}` | Clean declines |
 | `wallet_idempotent_replays_total` | Retries served from the original result |
@@ -165,6 +166,13 @@ docker compose logs -f app | grep '"event"'
 
 Counters are incremented only after the transaction commits, so a rolled-back
 attempt never inflates them.
+
+Latency is published as client-side quantiles rather than bucket series.
+Micrometer's Prometheus registry emits one or the other, never both, and
+buckets would silently replace the quantiles. Buckets are the better choice
+once there are several instances to aggregate across, since quantiles cannot be
+averaged; for a single instance, a p99 you can read directly from `/metrics`
+without a Prometheus server is worth more.
 
 ## Container
 

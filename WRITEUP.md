@@ -127,7 +127,12 @@ storing a response body; seeding new wallets with an opening balance;
 Spring Boot's native ECS structured logging instead of a third-party encoder;
 and the Alpine runtime image using BusyBox `wget` for the healthcheck.
 
-**Caught by testing rather than by reading:** Micrometer silently renamed
+**Caught by testing rather than by reading:** p99 latency was configured but
+never actually published. Enabling `percentiles-histogram` alongside
+`percentiles` causes Micrometer's Prometheus registry to emit bucket series
+*instead of* quantile series, so `/metrics` carried no p99 at all. Only
+measuring the endpoint's real output across four configurations — rather than
+trusting that the properties were set — exposed it. Also, Micrometer silently renamed
 `wallet_transfers_created_total` to `wallet_transfers_total`, because
 OpenMetrics reserves a `_created` suffix — the counter was renamed to
 `wallet_transfers_completed_total`. Separately, Spring Boot disables metrics

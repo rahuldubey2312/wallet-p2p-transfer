@@ -19,8 +19,9 @@ trap 'rm -rf "${WORK_DIR}"' EXIT
 
 FAILURES=0
 
-# Corporate proxies would otherwise swallow localhost traffic.
-CURL=(curl --silent --show-error --noproxy '*' --max-time 60)
+# Bypass any configured proxy for loopback only. Bypassing it wholesale would
+# break a deployed https:// target on a network that requires the proxy.
+CURL=(curl --silent --show-error --noproxy localhost,127.0.0.1 --max-time 90)
 
 log()  { printf '%s\n' "$*"; }
 pass() { printf '  PASS  %s\n' "$*"; }

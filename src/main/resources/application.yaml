@@ -53,8 +53,15 @@ management:
         enabled: true
   metrics:
     distribution:
-      percentiles-histogram:
-        http.server.requests: true
+      # Publishes p50/p95/p99 as quantile series, so latency is readable
+      # directly from /metrics without a Prometheus server to aggregate it.
+      #
+      # percentiles-histogram is deliberately NOT enabled alongside this:
+      # Micrometer's Prometheus registry publishes either bucket series or
+      # client-side quantiles, not both, and the buckets would silently
+      # replace the quantiles. Buckets are the better choice once there are
+      # several instances to aggregate across, because quantiles cannot be
+      # averaged; with a single instance, a directly readable p99 wins.
       percentiles:
         http.server.requests: 0.5,0.95,0.99
   observations:
