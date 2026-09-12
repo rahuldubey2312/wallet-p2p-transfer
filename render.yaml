@@ -7,7 +7,11 @@ services:
     name: wallet-service
     runtime: docker
     plan: free
-    region: singapore
+    # The service and the database must share a region, otherwise the private
+    # network connection string below is unreachable. Oregon is Render's
+    # default, so pinning both here keeps them together whatever the
+    # dashboard or free-tier availability would otherwise pick.
+    region: oregon
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
     envVars:
@@ -40,6 +44,7 @@ services:
 databases:
   - name: wallet-db
     plan: free
+    region: oregon
     databaseName: wallet
     user: wallet
     # Pinned to the major version the tests run against, rather than following
