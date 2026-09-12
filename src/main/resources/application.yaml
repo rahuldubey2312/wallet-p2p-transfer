@@ -1,0 +1,68 @@
+spring:
+  application:
+    name: wallet-service
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/wallet}
+    username: ${SPRING_DATASOURCE_USERNAME:wallet}
+    password: ${SPRING_DATASOURCE_PASSWORD:wallet}
+    hikari:
+      # Sized for a free-tier managed Postgres, which allows far fewer
+      # connections than a laptop. Transfers are short, so a small pool
+      # sustains a large burst by queueing rather than by opening sockets.
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      minimum-idle: 1
+      connection-timeout: 30000
+      pool-name: wallet-pool
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  # READ COMMITTED, the Postgres default, is left in place deliberately: the
+  # correctness of a transfer comes from row locks taken in a fixed order and a
+  # conditional debit, not from a heavier isolation level.
+
+server:
+  port: ${PORT:8080}
+  shutdown: graceful
+  tomcat:
+    threads:
+      max: ${SERVER_MAX_THREADS:100}
+
+logging:
+  structured:
+    format:
+      console: ecs
+  level:
+    root: INFO
+    dev.rdubey.wallet: INFO
+
+management:
+  endpoints:
+    web:
+      base-path: /
+      path-mapping:
+        prometheus: metrics
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
+  observations:
+    key-values:
+      application: wallet-service
+
+wallet:
+  # Wallets are seeded so a reviewer can transfer immediately without a funding
+  # endpoint. Creating a wallet is not a transfer, so conservation, which is
+  # asserted across transfers, is unaffected.
+  opening-balance-paise: ${WALLET_OPENING_BALANCE_PAISE:1000000}
