@@ -16,11 +16,14 @@ One command brings up the app and Postgres together:
 docker compose up --build
 ```
 
-Then reproduce all three probes:
+Then verify the contract and the invariants:
 
 ```bash
-./burst.sh http://localhost:8080
+./verify-api.sh http://localhost:8080   # every endpoint and failure mode
+./burst.sh      http://localhost:8080   # the three concurrency probes
 ```
+
+Both take a base URL, so the same two commands check the deployed service.
 
 If port 8080 or 5432 is taken on your machine:
 
