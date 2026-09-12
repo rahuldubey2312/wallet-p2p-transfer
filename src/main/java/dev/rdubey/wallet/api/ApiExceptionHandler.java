@@ -1,9 +1,11 @@
 package dev.rdubey.wallet.api;
 
 import dev.rdubey.wallet.api.filter.CorrelationIdFilter;
+import dev.rdubey.wallet.domain.exception.EmailAlreadyRegisteredException;
 import dev.rdubey.wallet.domain.exception.IdempotencyConflictException;
 import dev.rdubey.wallet.domain.exception.InvalidTransferException;
 import dev.rdubey.wallet.domain.exception.TransferNotFoundException;
+import dev.rdubey.wallet.domain.exception.UserNotFoundException;
 import dev.rdubey.wallet.domain.exception.WalletAccessDeniedException;
 import dev.rdubey.wallet.domain.exception.WalletNotFoundException;
 import org.slf4j.Logger;
@@ -40,6 +42,18 @@ public class ApiExceptionHandler
     public ProblemDetail handleTransferNotFound(TransferNotFoundException e)
     {
         return problem(HttpStatus.NOT_FOUND, "transfer_not_found", e.getMessage());
+    }
+
+    @ExceptionHandler(UserNotFoundException.class)
+    public ProblemDetail handleUserNotFound(UserNotFoundException e)
+    {
+        return problem(HttpStatus.NOT_FOUND, "user_not_found", e.getMessage());
+    }
+
+    @ExceptionHandler(EmailAlreadyRegisteredException.class)
+    public ProblemDetail handleDuplicateEmail(EmailAlreadyRegisteredException e)
+    {
+        return problem(HttpStatus.CONFLICT, "email_already_registered", e.getMessage());
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

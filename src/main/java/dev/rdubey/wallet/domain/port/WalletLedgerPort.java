@@ -12,10 +12,10 @@ import java.util.UUID;
 public interface WalletLedgerPort
 {
     /**
-     * Returns the caller's wallet, creating it only if absent. Concurrent
-     * calls for the same user must converge on a single wallet.
+     * Returns the owner's wallet, creating it only if absent. Concurrent calls
+     * for the same owner must converge on a single wallet.
      */
-    GetOrCreateResult getOrCreate(String userId, long openingBalancePaise);
+    GetOrCreateResult getOrCreate(UUID ownerId, long openingBalancePaise);
 
     /**
      * Takes a row lock on the wallet. Callers must invoke this for the wallets

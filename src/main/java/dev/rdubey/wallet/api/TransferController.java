@@ -37,7 +37,7 @@ public class TransferController
 
     @PostMapping("/transfers")
     public ResponseEntity<TransferResponse> transfer(
-            @RequestAttribute(BearerAuthFilter.USER_ID_ATTRIBUTE) String userId,
+            @RequestAttribute(BearerAuthFilter.USER_ID_ATTRIBUTE) UUID userId,
             @Valid @RequestBody TransferRequest request)
     {
         TransferOutcome outcome = transferService.transfer(new TransferCommand(userId,

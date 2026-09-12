@@ -1,5 +1,7 @@
 package dev.rdubey.wallet.api.filter;
 
+import dev.rdubey.wallet.application.AccessTokens;
+import dev.rdubey.wallet.domain.port.CredentialPort;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,20 +16,17 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 /**
- * Identifies the caller from a bearer token.
+ * Authenticates a caller from a token the service itself issued.
  * <p>
- * The token is a shared secret chosen by the caller; there is no registration
- * step. The user identity is a one-way derivation of the token rather than the
- * token itself, so the credential never reaches the database, the logs, or an
- * error response. Two requests bearing the same token are the same user.
- * <p>
- * This is deliberately minimal: the exercise does not grade auth
- * sophistication, only that a caller is identified.
+ * The presented token is hashed and looked up in {@code user_tokens}; an
+ * unknown token is rejected. Comparing hashes means the credential is never
+ * stored in a replayable form, and the resolved identity is the user's id, so
+ * the token never reaches the logs, the database rows, or an error response.
  */
 @Component
 @Order(BearerAuthFilter.ORDER)
@@ -38,15 +37,28 @@ public class BearerAuthFilter extends OncePerRequestFilter
     public static final String MDC_KEY = "user_id";
 
     private static final String BEARER_PREFIX = "Bearer ";
-    private static final int MIN_TOKEN_LENGTH = 8;
     private static final int MAX_TOKEN_LENGTH = 512;
     private static final Set<String> PUBLIC_PATHS = Set.of("/", "/health", "/metrics", "/info");
+
+    private final CredentialPort credentials;
+    private final AccessTokens accessTokens;
+
+    public BearerAuthFilter(CredentialPort credentials, AccessTokens accessTokens)
+    {
+        this.credentials = credentials;
+        this.accessTokens = accessTokens;
+    }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request)
     {
         String path = request.getRequestURI();
-        return PUBLIC_PATHS.contains(path) || path.startsWith("/health/");
+        if (PUBLIC_PATHS.contains(path) || path.startsWith("/health/"))
+        {
+            return true;
+        }
+        // Registration is how a caller obtains a token, so it cannot require one.
+        return "POST".equals(request.getMethod()) && "/users".equals(path);
     }
 
     @Override
@@ -57,21 +69,26 @@ public class BearerAuthFilter extends OncePerRequestFilter
         String header = request.getHeader(HttpHeaders.AUTHORIZATION);
         if (header == null || !header.startsWith(BEARER_PREFIX))
         {
-            reject(response, "missing bearer token");
+            reject(response, "missing bearer token; create a user with POST /users to obtain one");
             return;
         }
 
         String token = header.substring(BEARER_PREFIX.length()).trim();
-        if (token.length() < MIN_TOKEN_LENGTH || token.length() > MAX_TOKEN_LENGTH)
+        if (token.isEmpty() || token.length() > MAX_TOKEN_LENGTH)
         {
-            reject(response, "bearer token must be between " + MIN_TOKEN_LENGTH
-                             + " and " + MAX_TOKEN_LENGTH + " characters");
+            reject(response, "malformed bearer token");
             return;
         }
 
-        String userId = userIdFor(token);
-        request.setAttribute(USER_ID_ATTRIBUTE, userId);
-        MDC.put(MDC_KEY, userId);
+        Optional<UUID> userId = credentials.resolveUserId(accessTokens.hash(token));
+        if (userId.isEmpty())
+        {
+            reject(response, "unrecognised token; create a user with POST /users to obtain one");
+            return;
+        }
+
+        request.setAttribute(USER_ID_ATTRIBUTE, userId.get());
+        MDC.put(MDC_KEY, userId.get().toString());
         try
         {
             chain.doFilter(request, response);
@@ -79,29 +96,6 @@ public class BearerAuthFilter extends OncePerRequestFilter
         finally
         {
             MDC.remove(MDC_KEY);
-        }
-    }
-
-    /**
-     * Derives a stable, non-reversible user id from the token so that logs and
-     * stored rows never contain the credential itself.
-     */
-    public static String userIdFor(String token)
-    {
-        try
-        {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hex = new StringBuilder("usr_");
-            for (int i = 0; i < 12; i++)
-            {
-                hex.append(String.format("%02x", hash[i]));
-            }
-            return hex.toString();
-        }
-        catch (NoSuchAlgorithmException e)
-        {
-            throw new IllegalStateException("SHA-256 is required but unavailable", e);
         }
     }
 

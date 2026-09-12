@@ -25,11 +25,16 @@ public class DomainEvents
 {
     private static final Logger LOG = LoggerFactory.getLogger("domain");
 
-    public void walletCreated(UUID walletId, String userId, long balancePaise)
+    public void walletCreated(UUID walletId, UUID ownerId, long balancePaise)
     {
         emit("wallet_created", Map.of("wallet_id", walletId,
-                                      "user_id", userId,
+                                      "user_id", ownerId,
                                       "balance_paise", balancePaise));
+    }
+
+    public void userRegistered(UUID userId)
+    {
+        emit("user_registered", Map.of("user_id", userId));
     }
 
     public void transferCreated(UUID transferId, UUID from, UUID to, long amountPaise)

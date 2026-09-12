@@ -37,12 +37,20 @@ class ApiContractIT
     }
 
     @Test
-    @DisplayName("a request without a bearer token is rejected")
+    @DisplayName("a request without a bearer token is rejected and says how to get one")
     void missingTokenIsUnauthorized() throws Exception
     {
         HttpResponse<String> response = http.postWithoutBody("/wallets", null);
         assertThat(response.statusCode()).isEqualTo(401);
-        assertThat(response.body()).doesNotContain("Exception");
+        assertThat(response.body()).contains("POST /users").doesNotContain("Exception");
+    }
+
+    @Test
+    @DisplayName("a token the service never issued is rejected")
+    void unknownTokenIsUnauthorized() throws Exception
+    {
+        HttpResponse<String> response = http.postWithoutBody("/wallets", "wlt_not_a_real_token_at_all");
+        assertThat(response.statusCode()).isEqualTo(401);
     }
 
     @Test
@@ -66,10 +74,35 @@ class ApiContractIT
     }
 
     @Test
+    @DisplayName("p99 latency is actually published, not merely configured")
+    void latencyPercentilesArePublished() throws Exception
+    {
+        http.get("/health", null);
+        assertThat(http.get("/metrics", null).body()).contains("quantile=\"0.99\"");
+    }
+
+    @Test
+    @DisplayName("registration requires a display name")
+    void registrationRequiresDisplayName() throws Exception
+    {
+        HttpResponse<String> response = http.post("/users", null, "{\"email\":\"nobody@example.com\"}");
+        assertThat(response.statusCode()).isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("an invalid email is rejected before a user is created")
+    void invalidEmailIsRejected() throws Exception
+    {
+        HttpResponse<String> response = http.post("/users", null,
+                                                  "{\"display_name\":\"Bad Email\",\"email\":\"not-an-email\"}");
+        assertThat(response.statusCode()).isEqualTo(400);
+    }
+
+    @Test
     @DisplayName("a transfer to the same wallet is rejected")
     void selfTransferIsRejected() throws Exception
     {
-        String token = "tok-" + UUID.randomUUID();
+        String token = newUserToken();
         String wallet = HttpProbe.stringField(http.postWithoutBody("/wallets", token).body(), "id");
 
         HttpResponse<String> response = http.post("/transfers", token, """
@@ -83,9 +116,9 @@ class ApiContractIT
     @DisplayName("a non-positive amount is rejected before anything is claimed")
     void nonPositiveAmountIsRejected() throws Exception
     {
-        String token = "tok-" + UUID.randomUUID();
+        String token = newUserToken();
         String from = HttpProbe.stringField(http.postWithoutBody("/wallets", token).body(), "id");
-        String to = HttpProbe.stringField(http.postWithoutBody("/wallets", "tok-" + UUID.randomUUID()).body(), "id");
+        String to = HttpProbe.stringField(http.postWithoutBody("/wallets", newUserToken()).body(), "id");
 
         HttpResponse<String> response = http.post("/transfers", token, """
                 {"from":"%s","to":"%s","amount_paise":0,"idempotency_key":"%s"}"""
@@ -98,7 +131,7 @@ class ApiContractIT
     @DisplayName("malformed JSON is a bad request, not a server error")
     void malformedJsonIsBadRequest() throws Exception
     {
-        HttpResponse<String> response = http.post("/transfers", "tok-" + UUID.randomUUID(), "{not json");
+        HttpResponse<String> response = http.post("/transfers", newUserToken(), "{not json");
         assertThat(response.statusCode()).isEqualTo(400);
         assertThat(response.body()).doesNotContain("Exception");
     }
@@ -107,7 +140,7 @@ class ApiContractIT
     @DisplayName("an unknown wallet is a 404")
     void unknownWalletIsNotFound() throws Exception
     {
-        HttpResponse<String> response = http.get("/wallets/" + UUID.randomUUID(), "tok-" + UUID.randomUUID());
+        HttpResponse<String> response = http.get("/wallets/" + UUID.randomUUID(), newUserToken());
         assertThat(response.statusCode()).isEqualTo(404);
     }
 
@@ -115,7 +148,17 @@ class ApiContractIT
     @DisplayName("every response carries a correlation id")
     void responsesCarryCorrelationId() throws Exception
     {
-        HttpResponse<String> response = http.postWithoutBody("/wallets", "tok-" + UUID.randomUUID());
+        HttpResponse<String> response = http.postWithoutBody("/wallets", newUserToken());
         assertThat(response.headers().firstValue("X-Correlation-Id")).isPresent();
+    }
+
+    private String newUserToken() throws Exception
+    {
+        HttpResponse<String> response = http.post("/users", null,
+                                                  """
+                                                  {"display_name":"Contract User %s"}"""
+                                                          .formatted(UUID.randomUUID()));
+        assertThat(response.statusCode()).isEqualTo(201);
+        return HttpProbe.stringField(response.body(), "token");
     }
 }

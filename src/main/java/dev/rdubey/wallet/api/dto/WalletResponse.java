@@ -10,11 +10,11 @@ import java.util.UUID;
  * anywhere on the wire.
  */
 public record WalletResponse(@JsonProperty("id") UUID id,
-                             @JsonProperty("user_id") String userId,
+                             @JsonProperty("user_id") UUID userId,
                              @JsonProperty("balance_paise") long balancePaise)
 {
     public static WalletResponse from(Wallet wallet)
     {
-        return new WalletResponse(wallet.id(), wallet.userId(), wallet.balance().paise());
+        return new WalletResponse(wallet.id(), wallet.ownerId(), wallet.balance().paise());
     }
 }

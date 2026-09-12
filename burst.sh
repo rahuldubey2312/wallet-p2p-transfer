@@ -32,17 +32,25 @@ json_field() {
   printf '%s' "$1" | sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*\"\{0,1\}\([^\",}]*\)\"\{0,1\}.*/\1/p" | head -1
 }
 
-new_token() { printf 'tok-%s-%s' "$(date +%s%N)" "${RANDOM}${RANDOM}"; }
+# Registers a user and echoes the token the service issued for it. Tokens are
+# minted server-side, so a caller cannot invent one.
+new_token() {
+  local body
+  body=$("${CURL[@]}" -X POST "${BASE_URL}/users" -H 'Content-Type: application/json' \
+    -d "{\"display_name\":\"Burst User $(date +%s%N)-${RANDOM}\"}")
+  json_field "${body}" token
+}
 
 create_wallet() {
   local token="$1"
   "${CURL[@]}" -X POST "${BASE_URL}/wallets" -H "Authorization: Bearer ${token}"
 }
 
+# Reads reuse one registered credential rather than minting a user per read.
 balance_of() {
   local wallet="$1"
   local body
-  body=$("${CURL[@]}" "${BASE_URL}/wallets/${wallet}" -H "Authorization: Bearer $(new_token)")
+  body=$("${CURL[@]}" "${BASE_URL}/wallets/${wallet}" -H "Authorization: Bearer ${READER_TOKEN}")
   json_field "${body}" balance_paise
 }
 
@@ -69,6 +77,12 @@ if [[ "${code:-000}" != "200" ]]; then
   exit 1
 fi
 log ""
+
+READER_TOKEN="$(new_token)"
+if [[ -z "${READER_TOKEN}" ]]; then
+  log "Could not register a user via POST ${BASE_URL}/users; cannot continue."
+  exit 1
+fi
 
 # ---------------------------------------------------------------------------
 log "PROBE 1  Concurrent get-or-create: ${GET_OR_CREATE_CALLS} simultaneous POST /wallets for one brand-new user"

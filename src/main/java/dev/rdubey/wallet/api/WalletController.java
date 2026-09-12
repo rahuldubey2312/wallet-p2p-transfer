@@ -27,7 +27,7 @@ public class WalletController
      * wallet id.
      */
     @PostMapping("/wallets")
-    public WalletResponse createOrGet(@RequestAttribute(BearerAuthFilter.USER_ID_ATTRIBUTE) String userId)
+    public WalletResponse createOrGet(@RequestAttribute(BearerAuthFilter.USER_ID_ATTRIBUTE) UUID userId)
     {
         return WalletResponse.from(walletService.getOrCreate(userId));
     }

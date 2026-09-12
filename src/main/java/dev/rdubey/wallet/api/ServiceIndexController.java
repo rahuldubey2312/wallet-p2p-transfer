@@ -21,6 +21,9 @@ public class ServiceIndexController
     public Map<String, Object> index()
     {
         Map<String, Object> endpoints = new LinkedHashMap<>();
+        endpoints.put("POST /users", "register a user; returns the bearer token, shown only once");
+        endpoints.put("GET /users/me", "the caller's profile, wallet and latest activity");
+        endpoints.put("GET /users/me/transactions", "the caller's transaction history; takes limit and offset");
         endpoints.put("POST /wallets", "get-or-create the caller's wallet; requires a bearer token");
         endpoints.put("GET /wallets/{id}", "current balance in integer paise");
         endpoints.put("POST /transfers", "move money; body carries from, to, amount_paise, idempotency_key");
@@ -31,7 +34,7 @@ public class ServiceIndexController
         Map<String, Object> index = new LinkedHashMap<>();
         index.put("service", "wallet-service");
         index.put("description", "Wallet with peer-to-peer transfers. Money is always integer paise.");
-        index.put("auth", "Authorization: Bearer <token>, where the token identifies the caller");
+        index.put("auth", "POST /users to obtain a token, then send it as 'Authorization: Bearer <token>'");
         index.put("repository", "https://github.com/rahuldubey2312/wallet-p2p-transfer");
         index.put("endpoints", endpoints);
         return index;

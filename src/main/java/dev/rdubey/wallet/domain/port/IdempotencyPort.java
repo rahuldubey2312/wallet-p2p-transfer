@@ -13,19 +13,19 @@ import java.util.UUID;
 public interface IdempotencyPort
 {
     /**
-     * Claims the key for this caller. Must be called inside the same
+     * Claims the key for this user. Must be called inside the same
      * transaction as the debit and credit.
      *
      * @throws org.springframework.dao.DuplicateKeyException if the key is
      *                                                       already claimed
      */
-    void claim(String userId, String idempotencyKey, String requestHash);
+    void claim(UUID userId, String idempotencyKey, String requestHash);
 
     /**
      * Links the claimed key to the transfer it produced, in the same
      * transaction as the claim.
      */
-    void complete(String userId, String idempotencyKey, UUID transferId);
+    void complete(UUID userId, String idempotencyKey, UUID transferId);
 
-    Optional<IdempotencyRecord> find(String userId, String idempotencyKey);
+    Optional<IdempotencyRecord> find(UUID userId, String idempotencyKey);
 }

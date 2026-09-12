@@ -18,7 +18,7 @@ public class JdbcWalletRepository implements WalletQueryPort, WalletLedgerPort
 {
     private static final RowMapper<Wallet> WALLET_MAPPER = (rs, rowNum) -> new Wallet(
             rs.getObject("id", UUID.class),
-            rs.getString("user_id"),
+            rs.getObject("owner_id", UUID.class),
             Money.ofPaise(rs.getLong("balance_paise")));
 
     private final JdbcTemplate jdbc;
@@ -31,15 +31,15 @@ public class JdbcWalletRepository implements WalletQueryPort, WalletLedgerPort
     @Override
     public Optional<Wallet> findById(UUID walletId)
     {
-        return jdbc.query("SELECT id, user_id, balance_paise FROM wallets WHERE id = ?",
+        return jdbc.query("SELECT id, owner_id, balance_paise FROM wallets WHERE id = ?",
                           WALLET_MAPPER, walletId).stream().findFirst();
     }
 
     @Override
-    public Optional<Wallet> findByUserId(String userId)
+    public Optional<Wallet> findByOwnerId(UUID ownerId)
     {
-        return jdbc.query("SELECT id, user_id, balance_paise FROM wallets WHERE user_id = ?",
-                          WALLET_MAPPER, userId).stream().findFirst();
+        return jdbc.query("SELECT id, owner_id, balance_paise FROM wallets WHERE owner_id = ?",
+                          WALLET_MAPPER, ownerId).stream().findFirst();
     }
 
     @Override
@@ -50,8 +50,8 @@ public class JdbcWalletRepository implements WalletQueryPort, WalletLedgerPort
     }
 
     /**
-     * The UNIQUE(user_id) constraint decides the winner when several requests
-     * for a brand-new user arrive at once: one INSERT lands, the rest are
+     * The UNIQUE(owner_id) constraint decides the winner when several requests
+     * for the same owner arrive at once: one INSERT lands, the rest are
      * absorbed by ON CONFLICT DO NOTHING and then read the winner's row.
      * <p>
      * The re-read is safe under READ COMMITTED because each statement takes a
@@ -59,23 +59,23 @@ public class JdbcWalletRepository implements WalletQueryPort, WalletLedgerPort
      * commit.
      */
     @Override
-    public GetOrCreateResult getOrCreate(String userId, long openingBalancePaise)
+    public GetOrCreateResult getOrCreate(UUID ownerId, long openingBalancePaise)
     {
-        Optional<Wallet> existing = findByUserId(userId);
+        Optional<Wallet> existing = findByOwnerId(ownerId);
         if (existing.isPresent())
         {
             return new GetOrCreateResult(existing.get(), false);
         }
 
         int inserted = jdbc.update("""
-                                   INSERT INTO wallets (id, user_id, balance_paise)
+                                   INSERT INTO wallets (id, owner_id, balance_paise)
                                    VALUES (?, ?, ?)
-                                   ON CONFLICT (user_id) DO NOTHING
+                                   ON CONFLICT (owner_id) DO NOTHING
                                    """,
-                                   UUID.randomUUID(), userId, openingBalancePaise);
+                                   UUID.randomUUID(), ownerId, openingBalancePaise);
 
-        Wallet wallet = findByUserId(userId)
-                .orElseThrow(() -> new IllegalStateException("wallet missing after upsert for user " + userId));
+        Wallet wallet = findByOwnerId(ownerId)
+                .orElseThrow(() -> new IllegalStateException("wallet missing after upsert for owner " + ownerId));
         return new GetOrCreateResult(wallet, inserted == 1);
     }
 

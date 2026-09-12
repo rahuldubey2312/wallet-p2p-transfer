@@ -40,23 +40,34 @@ Run the test suite (needs Docker; it starts a real Postgres via Testcontainers):
 Every endpoint except `/health`, `/info` and `/metrics` requires
 `Authorization: Bearer <token>`.
 
-| Method | Path              | Purpose                              | Success |
-|--------|-------------------|--------------------------------------|---------|
-| POST   | `/wallets`        | Get-or-create the caller's wallet    | 200 |
-| GET    | `/wallets/{id}`   | Current balance                      | 200 |
-| POST   | `/transfers`      | Move money between two wallets       | 201 |
-| GET    | `/transfers/{id}` | Transfer status                      | 200 |
-| GET    | `/health`         | Liveness and readiness               | 200 |
-| GET    | `/metrics`        | Prometheus exposition                | 200 |
+| Method | Path                       | Purpose                                        | Success |
+|--------|----------------------------|------------------------------------------------|---------|
+| POST   | `/users`                   | Register a user; returns the issued token      | 201 |
+| GET    | `/users/me`                | Caller's profile, wallet and latest activity   | 200 |
+| GET    | `/users/me/transactions`   | Caller's transaction history (`limit`/`offset`)| 200 |
+| POST   | `/wallets`                 | Get-or-create the caller's wallet              | 200 |
+| GET    | `/wallets/{id}`            | Current balance                                | 200 |
+| POST   | `/transfers`               | Move money between two wallets                 | 201 |
+| GET    | `/transfers/{id}`          | Transfer status                                | 200 |
+| GET    | `/`                        | Service index                                  | 200 |
+| GET    | `/health`                  | Liveness and readiness                         | 200 |
+| GET    | `/metrics`                 | Prometheus exposition                          | 200 |
 
 ### Auth
 
-The bearer token is a secret the caller picks; there is no registration step.
-The user identity is a one-way SHA-256 derivation of the token
-(`usr_<24 hex chars>`), so the credential itself never reaches the database,
-the logs, or an error response. Two requests with the same token are the same
-user. This is deliberately minimal — the exercise does not grade auth
-sophistication.
+Tokens are issued by the service, not chosen by the caller. `POST /users`
+registers a user and returns a token once; it cannot be retrieved afterwards,
+because only its SHA-256 is stored. Presenting a token hashes it and looks the
+hash up in `user_tokens`, so a database dump holds nothing replayable and the
+credential never reaches the logs, the stored rows, or an error response.
+
+An unrecognised token is rejected with a 401 whose message names
+`POST /users`, so a caller who guesses at the flow is told what to do rather
+than left wondering whether the service is broken.
+
+This is deliberately modest — no password, no refresh, no expiry — because the
+exercise does not grade auth sophistication. What it does give is a real user
+entity that a wallet and its transaction history hang off.
 
 ### Opening balance
 
@@ -70,13 +81,23 @@ the conservation invariant — which is asserted across transfers — is unaffec
 ```bash
 BASE=http://localhost:8080
 
-A=$(curl -s -XPOST $BASE/wallets -H "Authorization: Bearer alice-secret-token" | jq -r .id)
-B=$(curl -s -XPOST $BASE/wallets -H "Authorization: Bearer bob-secret-token"   | jq -r .id)
+# Register two users and keep the tokens the service issues
+ALICE=$(curl -s -XPOST $BASE/users -H 'Content-Type: application/json' \
+  -d '{"display_name":"Alice","email":"alice@example.com"}' | jq -r .token)
+BOB=$(curl -s -XPOST $BASE/users -H 'Content-Type: application/json' \
+  -d '{"display_name":"Bob"}' | jq -r .token)
+
+# Each opens a wallet
+A=$(curl -s -XPOST $BASE/wallets -H "Authorization: Bearer $ALICE" | jq -r .id)
+B=$(curl -s -XPOST $BASE/wallets -H "Authorization: Bearer $BOB"   | jq -r .id)
 
 curl -s -XPOST $BASE/transfers \
-  -H "Authorization: Bearer alice-secret-token" \
+  -H "Authorization: Bearer $ALICE" \
   -H 'Content-Type: application/json' \
   -d "{\"from\":\"$A\",\"to\":\"$B\",\"amount_paise\":25000,\"idempotency_key\":\"demo-1\"}"
+
+# Alice sees a DEBIT, Bob sees a CREDIT, for the same transfer
+curl -s "$BASE/users/me/transactions" -H "Authorization: Bearer $ALICE" | jq
 ```
 
 Re-sending that exact request returns the identical body with

@@ -13,7 +13,7 @@ import java.util.UUID;
 public class JdbcIdempotencyRepository implements IdempotencyPort
 {
     private static final RowMapper<IdempotencyRecord> RECORD_MAPPER = (rs, rowNum) -> new IdempotencyRecord(
-            rs.getString("user_id"),
+            rs.getObject("user_id", UUID.class),
             rs.getString("idempotency_key"),
             rs.getString("request_hash"),
             rs.getObject("transfer_id", UUID.class));
@@ -32,14 +32,14 @@ public class JdbcIdempotencyRepository implements IdempotencyPort
      * only sees a conflict once the winner has actually committed.
      */
     @Override
-    public void claim(String userId, String idempotencyKey, String requestHash)
+    public void claim(UUID userId, String idempotencyKey, String requestHash)
     {
         jdbc.update("INSERT INTO idempotency_keys (user_id, idempotency_key, request_hash) VALUES (?, ?, ?)",
                     userId, idempotencyKey, requestHash);
     }
 
     @Override
-    public void complete(String userId, String idempotencyKey, UUID transferId)
+    public void complete(UUID userId, String idempotencyKey, UUID transferId)
     {
         jdbc.update("""
                     UPDATE idempotency_keys
@@ -50,7 +50,7 @@ public class JdbcIdempotencyRepository implements IdempotencyPort
     }
 
     @Override
-    public Optional<IdempotencyRecord> find(String userId, String idempotencyKey)
+    public Optional<IdempotencyRecord> find(UUID userId, String idempotencyKey)
     {
         return jdbc.query("""
                           SELECT user_id, idempotency_key, request_hash, transfer_id

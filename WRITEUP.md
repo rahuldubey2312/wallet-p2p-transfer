@@ -2,13 +2,21 @@
 
 ## Data model
 
-Three tables, in PostgreSQL 16, created by Flyway at startup.
+Five tables, in PostgreSQL 16, created by Flyway at startup.
 
 | Table | Columns | Why it looks like this |
 |---|---|---|
-| `wallets` | `id` uuid pk, `user_id` text **unique**, `balance_paise` bigint `CHECK (>= 0)`, `created_at` | The unique constraint on `user_id` is the whole of race-free get-or-create. The check constraint means even a future bug cannot persist a negative balance. |
+| `users` | `id` uuid pk, `display_name`, `email` **unique**, `phone`, `created_at` | Postgres allows many NULLs under a unique index, which is exactly the intent: an email is optional but no two users may share one, and the constraint — not a prior lookup — is what decides a race between two registrations. |
+| `user_tokens` | `token_hash` **pk**, `user_id` fk, `created_at` | Only the SHA-256 of an issued token is stored, so a dump of this table cannot be replayed against the API. There is deliberately no `last_used_at`: stamping it would mean writing the same row on every authenticated request, and a burst sharing one token would then serialise on that row's lock instead of proceeding in parallel. |
+| `wallets` | `id` uuid pk, `owner_id` uuid fk **unique**, `balance_paise` bigint `CHECK (>= 0)`, `created_at` | The unique constraint on `owner_id` is the whole of race-free get-or-create. The check constraint means even a future bug cannot persist a negative balance. |
 | `transfers` | `id` uuid pk, `from_wallet_id`, `to_wallet_id`, `amount_paise` bigint `CHECK (> 0)`, `status`, `created_at`, `CHECK (from <> to)` | Declined attempts are rows too, so a retry replays the decline instead of re-attempting it. |
 | `idempotency_keys` | **pk `(user_id, idempotency_key)`**, `request_hash`, `transfer_id` fk, `created_at` | The primary key is the single point of exactly-once enforcement. |
+
+Transaction history is **not** a sixth table. It is projected from `transfers`,
+with each row's direction computed relative to the wallet being asked about, so
+a statement can never disagree with the balance it explains. The alternative —
+writing ledger rows alongside each transfer — would double the writes on the
+money path and create a second copy that could drift.
 
 Money is `bigint` paise throughout, wrapped in a `Money` value object in the
 domain. There is no floating point and no rupee decimal anywhere in the money

@@ -14,7 +14,7 @@ public interface WalletQueryPort
 {
     Optional<Wallet> findById(UUID walletId);
 
-    Optional<Wallet> findByUserId(String userId);
+    Optional<Wallet> findByOwnerId(UUID ownerId);
 
     /**
      * Sum of every wallet balance. Used only by tests and diagnostics to

@@ -4,12 +4,12 @@ import java.util.UUID;
 
 /**
  * A user's wallet. Exactly one wallet exists per user, enforced by a UNIQUE
- * constraint on the user id rather than by application-side checking.
+ * constraint on the owner rather than by application-side checking.
  */
-public record Wallet(UUID id, String userId, Money balance)
+public record Wallet(UUID id, UUID ownerId, Money balance)
 {
-    public boolean isOwnedBy(String candidateUserId)
+    public boolean isOwnedBy(UUID candidateOwnerId)
     {
-        return userId.equals(candidateUserId);
+        return ownerId.equals(candidateOwnerId);
     }
 }

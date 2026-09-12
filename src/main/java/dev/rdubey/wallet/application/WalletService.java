@@ -40,23 +40,23 @@ public class WalletService
 
     /**
      * Returns the caller's wallet, creating it on first call. Concurrent
-     * callers for a brand-new user all receive the same wallet: the database
+     * callers for the same user all receive the same wallet: the database
      * decides the winner, so no double creation is possible.
      */
-    public Wallet getOrCreate(String userId)
+    public Wallet getOrCreate(UUID ownerId)
     {
         GetOrCreateResult result = transactionTemplate.execute(
-                status -> ledger.getOrCreate(userId, properties.openingBalancePaise()));
+                status -> ledger.getOrCreate(ownerId, properties.openingBalancePaise()));
 
         if (result == null)
         {
-            throw new IllegalStateException("get-or-create returned no result for user " + userId);
+            throw new IllegalStateException("get-or-create returned no result for owner " + ownerId);
         }
 
         if (result.created())
         {
             metrics.walletCreated();
-            events.walletCreated(result.wallet().id(), userId, result.wallet().balance().paise());
+            events.walletCreated(result.wallet().id(), ownerId, result.wallet().balance().paise());
         }
         return result.wallet();
     }

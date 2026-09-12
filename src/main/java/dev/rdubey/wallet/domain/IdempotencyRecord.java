@@ -14,7 +14,7 @@ import java.util.UUID;
  *                    fingerprint is a conflict, not a second transfer
  * @param transferId  the transfer this key produced
  */
-public record IdempotencyRecord(String userId,
+public record IdempotencyRecord(UUID userId,
                                 String idempotencyKey,
                                 String requestHash,
                                 UUID transferId)

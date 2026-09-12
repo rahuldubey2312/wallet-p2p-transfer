@@ -37,18 +37,20 @@ class WalletInvariantsIT
     private WalletQueryPort wallets;
 
     private HttpProbe http;
+    private String readerToken;
 
     @BeforeEach
-    void setUp()
+    void setUp() throws Exception
     {
         http = new HttpProbe(port);
+        readerToken = newUserToken();
     }
 
     @Test
     @DisplayName("Invariant 4: concurrent get-or-create for one new user yields exactly one wallet")
     void concurrentGetOrCreateYieldsExactlyOneWallet() throws Exception
     {
-        String token = freshToken();
+        String token = newUserToken();
 
         List<HttpResponse<String>> responses = http.fireTogether(25, () -> http.postWithoutBody("/wallets", token));
 
@@ -64,9 +66,9 @@ class WalletInvariantsIT
     @DisplayName("Invariant 3: a retry storm on one idempotency key debits exactly once")
     void idempotentRetryStormAppliesExactlyOneDebit() throws Exception
     {
-        String senderToken = freshToken();
+        String senderToken = newUserToken();
         String sender = createWallet(senderToken);
-        String recipient = createWallet(freshToken());
+        String recipient = createWallet(newUserToken());
         long amount = 25_000L;
 
         String body = transferBody(sender, recipient, amount, "storm-" + UUID.randomUUID());
@@ -91,8 +93,8 @@ class WalletInvariantsIT
     @DisplayName("Invariants 1 and 2: bidirectional contention conserves the total and never goes negative")
     void bidirectionalContentionConservesTotal() throws Exception
     {
-        String tokenA = freshToken();
-        String tokenB = freshToken();
+        String tokenA = newUserToken();
+        String tokenB = newUserToken();
         String walletA = createWallet(tokenA);
         String walletB = createWallet(tokenB);
 
@@ -127,9 +129,9 @@ class WalletInvariantsIT
     @DisplayName("Invariant 2: an overdraft is declined cleanly and moves no money")
     void overdraftIsDeclinedAndChangesNothing() throws Exception
     {
-        String senderToken = freshToken();
+        String senderToken = newUserToken();
         String sender = createWallet(senderToken);
-        String recipient = createWallet(freshToken());
+        String recipient = createWallet(newUserToken());
 
         HttpResponse<String> response = http.post("/transfers", senderToken,
                                                   transferBody(sender, recipient, OPENING_BALANCE + 1,
@@ -145,9 +147,9 @@ class WalletInvariantsIT
     @DisplayName("Invariant 3: a declined result is itself replayed, not retried")
     void declinedTransferIsReplayedOnRetry() throws Exception
     {
-        String senderToken = freshToken();
+        String senderToken = newUserToken();
         String sender = createWallet(senderToken);
-        String recipient = createWallet(freshToken());
+        String recipient = createWallet(newUserToken());
         String key = UUID.randomUUID().toString();
         String body = transferBody(sender, recipient, OPENING_BALANCE + 1, key);
 
@@ -164,9 +166,9 @@ class WalletInvariantsIT
     @DisplayName("Invariant 3: the same key with a different body is a conflict, not a second debit")
     void sameKeyDifferentBodyConflicts() throws Exception
     {
-        String senderToken = freshToken();
+        String senderToken = newUserToken();
         String sender = createWallet(senderToken);
-        String recipient = createWallet(freshToken());
+        String recipient = createWallet(newUserToken());
         String key = UUID.randomUUID().toString();
 
         HttpResponse<String> first = http.post("/transfers", senderToken,
@@ -184,8 +186,8 @@ class WalletInvariantsIT
     @DisplayName("A caller may not debit a wallet it does not own")
     void debitingSomeoneElsesWalletIsForbidden() throws Exception
     {
-        String victim = createWallet(freshToken());
-        String attackerToken = freshToken();
+        String victim = createWallet(newUserToken());
+        String attackerToken = newUserToken();
         String attacker = createWallet(attackerToken);
 
         HttpResponse<String> response = http.post("/transfers", attackerToken,
@@ -205,9 +207,20 @@ class WalletInvariantsIT
 
     private long balanceOf(String walletId) throws Exception
     {
-        HttpResponse<String> response = http.get("/wallets/" + walletId, freshToken());
+        HttpResponse<String> response = http.get("/wallets/" + walletId, readerToken);
         assertThat(response.statusCode()).isEqualTo(200);
         return HttpProbe.longField(response.body(), "balance_paise");
+    }
+
+    /** Registers a user and returns the token the service issued for it. */
+    private String newUserToken() throws Exception
+    {
+        HttpResponse<String> response = http.post("/users", null,
+                                                  """
+                                                  {"display_name":"Test User %s"}"""
+                                                          .formatted(UUID.randomUUID()));
+        assertThat(response.statusCode()).isEqualTo(201);
+        return HttpProbe.stringField(response.body(), "token");
     }
 
     private static String transferBody(String from, String to, long amountPaise, String idempotencyKey)
@@ -215,10 +228,5 @@ class WalletInvariantsIT
         return """
                {"from":"%s","to":"%s","amount_paise":%d,"idempotency_key":"%s"}"""
                 .formatted(from, to, amountPaise, idempotencyKey);
-    }
-
-    private static String freshToken()
-    {
-        return "tok-" + UUID.randomUUID();
     }
 }
