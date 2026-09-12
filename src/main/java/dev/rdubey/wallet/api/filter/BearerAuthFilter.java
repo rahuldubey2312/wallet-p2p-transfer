@@ -40,7 +40,7 @@ public class BearerAuthFilter extends OncePerRequestFilter
     private static final String BEARER_PREFIX = "Bearer ";
     private static final int MIN_TOKEN_LENGTH = 8;
     private static final int MAX_TOKEN_LENGTH = 512;
-    private static final Set<String> PUBLIC_PATHS = Set.of("/health", "/metrics", "/info");
+    private static final Set<String> PUBLIC_PATHS = Set.of("/", "/health", "/metrics", "/info");
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request)

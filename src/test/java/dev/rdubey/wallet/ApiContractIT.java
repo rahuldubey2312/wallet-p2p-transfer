@@ -46,6 +46,15 @@ class ApiContractIT
     }
 
     @Test
+    @DisplayName("the root path is a public index, not a 401")
+    void rootPathIsAPublicIndex() throws Exception
+    {
+        HttpResponse<String> response = http.get("/", null);
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body()).contains("wallet-service").contains("POST /transfers");
+    }
+
+    @Test
     @DisplayName("health and metrics are reachable without a token")
     void operationalEndpointsArePublic() throws Exception
     {
