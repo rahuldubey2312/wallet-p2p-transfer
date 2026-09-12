@@ -1,7 +1,7 @@
-# Render blueprint: one web service on the free plan plus a free managed
-# Postgres. Import this file from the Render dashboard (Blueprints -> New) and
-# both are provisioned wired together, with no dashboard fields to fill in by
-# hand and nothing to mistype.
+# Render blueprint: one free web service plus one free managed Postgres,
+# provisioned already wired together. Import from the Render dashboard
+# (Blueprints -> New Blueprint Instance) so there is nothing to type by hand
+# and nothing to mistype.
 services:
   - type: web
     name: wallet-service
@@ -11,20 +11,37 @@ services:
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
     envVars:
-      # Render hands out a postgres:// URL, which JDBC cannot consume
-      # directly. DatabaseUrlEnvironmentPostProcessor translates DATABASE_URL
-      # into the jdbc: form plus credentials at startup.
+      # Render hands out a postgres:// URL, which JDBC cannot consume directly.
+      # DatabaseUrlEnvironmentPostProcessor translates it at startup. This is
+      # the private-network connection string, so database traffic never
+      # traverses the public internet.
       - key: DATABASE_URL
         fromDatabase:
           name: wallet-db
           property: connectionString
+
+      # The free database is small and does not offer managed pooling, so the
+      # pool is kept well inside its connection budget. Transfers are a few
+      # milliseconds, so a burst queues briefly rather than needing sockets.
       - key: DB_POOL_SIZE
-        value: "8"
+        value: "5"
+
+      # Free compute is 0.1 CPU / 512 MB. SerialGC suits a single-digit-CPU
+      # container better than G1, which reserves more memory and spawns
+      # parallel GC threads there is no CPU to run.
       - key: JAVA_OPTS
-        value: -XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError
+        value: -XX:MaxRAMPercentage=65 -XX:+UseSerialGC -Xss512k -XX:+ExitOnOutOfMemoryError
+
+      # Each request thread costs stack space on a 512 MB box, and the database
+      # pool is the real limit anyway.
+      - key: SERVER_MAX_THREADS
+        value: "50"
 
 databases:
   - name: wallet-db
     plan: free
     databaseName: wallet
     user: wallet
+    # Pinned to the major version the tests run against, rather than following
+    # whatever Render currently defaults to.
+    postgresMajorVersion: "16"

@@ -191,9 +191,14 @@ provisions the web service and a free managed Postgres already wired together.
 `DatabaseUrlEnvironmentPostProcessor` translates it at startup. Setting
 `SPRING_DATASOURCE_URL` explicitly overrides that.
 
-The free plan sleeps when idle, so the first request after a quiet period can
-take 30–60 seconds. `burst.sh` polls `/health` until the service wakes before
-it measures anything.
+Free-tier behaviour worth knowing before you test the live URL:
+
+- The web service **sleeps after 15 idle minutes** and takes roughly a minute
+  to wake. `burst.sh` polls `/health` until it is up before measuring anything,
+  so a cold start is never mistaken for a failure.
+- A free Render Postgres **expires 30 days after creation**, after which it is
+  inaccessible until upgraded to a paid plan. Data here is disposable, so the
+  remedy is to re-apply the blueprint; nothing in the schema needs preserving.
 
 ### Configuration
 
