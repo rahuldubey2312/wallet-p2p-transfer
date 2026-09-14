@@ -172,12 +172,35 @@ Full reasoning, including the alternatives that were rejected, is in
 
 **Logs** are structured JSON (ECS) on stdout, carrying a `correlation_id` on
 every line. Supply `X-Correlation-Id` to stitch your own trace; it is echoed
-back. Domain events emitted: `wallet_created`, `transfer_created`, `debited`,
-`credited`, `declined`, `idempotent_replay`, `idempotency_conflict`.
+back. Domain events emitted: `user_registered`, `wallet_created`,
+`transfer_created`, `debited`, `credited`, `declined`, `idempotent_replay`,
+`idempotency_conflict`.
 
 ```bash
 docker compose logs -f app | grep '"event"'
 ```
+
+**Reading the logs without an account.** A hosting provider's log console sits
+behind a login, which makes a link to it worthless to anyone who does not have
+one. The same events are therefore readable over HTTP:
+
+```
+GET /logs/recent?limit=100      # no auth
+```
+
+It returns the last 500 events, newest first, with their correlation ids. To
+see it populated, run the burst script against the service and refresh:
+
+```bash
+./burst.sh https://wallet-service-1eb9.onrender.com
+curl -s https://wallet-service-1eb9.onrender.com/logs/recent | jq
+```
+
+The buffer is in memory and capped, so it resets when the instance restarts and
+cannot grow without bound. It is a window onto the log stream, not the log
+itself: stdout remains authoritative. It is unauthenticated deliberately —
+tokens are never logged and the identities are opaque ids over play money. A
+service holding real customer data would put this behind an operator role.
 
 **Metrics** at `/metrics` in Prometheus format:
 

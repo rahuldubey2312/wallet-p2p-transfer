@@ -38,7 +38,10 @@ public class BearerAuthFilter extends OncePerRequestFilter
 
     private static final String BEARER_PREFIX = "Bearer ";
     private static final int MAX_TOKEN_LENGTH = 512;
-    private static final Set<String> PUBLIC_PATHS = Set.of("/", "/health", "/metrics", "/info");
+    // /logs/recent is public by design: it is the reviewer-facing view of the
+    // log stream, and a login would defeat its purpose.
+    private static final Set<String> PUBLIC_PATHS =
+            Set.of("/", "/health", "/metrics", "/info", "/logs/recent");
 
     private final CredentialPort credentials;
     private final AccessTokens accessTokens;

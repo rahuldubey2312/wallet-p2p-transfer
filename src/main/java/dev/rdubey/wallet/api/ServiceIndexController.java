@@ -28,6 +28,7 @@ public class ServiceIndexController
         endpoints.put("GET /wallets/{id}", "current balance in integer paise");
         endpoints.put("POST /transfers", "move money; body carries from, to, amount_paise, idempotency_key");
         endpoints.put("GET /transfers/{id}", "transfer status");
+        endpoints.put("GET /logs/recent", "recent domain events with correlation ids, no auth required");
         endpoints.put("GET /health", "liveness and readiness");
         endpoints.put("GET /metrics", "Prometheus exposition, including domain counters and p99 latency");
 

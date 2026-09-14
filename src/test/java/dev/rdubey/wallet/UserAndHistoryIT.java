@@ -150,6 +150,29 @@ class UserAndHistoryIT
         assertThat(HttpProbe.longField(firstPage.body(), "limit")).isEqualTo(2);
     }
 
+    @Test
+    @DisplayName("recent domain events are readable over HTTP without a token")
+    void recentLogsArePubliclyReadable() throws Exception
+    {
+        String senderToken = newUserToken("Logged Sender");
+        String sender = HttpProbe.stringField(http.postWithoutBody("/wallets", senderToken).body(), "id");
+        String recipient = HttpProbe.stringField(
+                http.postWithoutBody("/wallets", newUserToken("Logged Recipient")).body(), "id");
+
+        http.post("/transfers", senderToken, """
+                {"from":"%s","to":"%s","amount_paise":4200,"idempotency_key":"%s"}"""
+                .formatted(sender, recipient, UUID.randomUUID()));
+
+        HttpResponse<String> logs = http.get("/logs/recent", null);
+
+        assertThat(logs.statusCode()).as("no bearer token required").isEqualTo(200);
+        assertThat(logs.body())
+                .contains("transfer_created")
+                .contains("debited")
+                .contains("credited")
+                .contains("correlation_id");
+    }
+
     private String newUserToken(String name) throws Exception
     {
         HttpResponse<String> response = http.post("/users", null,

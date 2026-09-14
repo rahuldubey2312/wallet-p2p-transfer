@@ -25,6 +25,13 @@ public class DomainEvents
 {
     private static final Logger LOG = LoggerFactory.getLogger("domain");
 
+    private final RecentEvents recentEvents;
+
+    public DomainEvents(RecentEvents recentEvents)
+    {
+        this.recentEvents = recentEvents;
+    }
+
     public void walletCreated(UUID walletId, UUID ownerId, long balancePaise)
     {
         emit("wallet_created", Map.of("wallet_id", walletId,
@@ -101,6 +108,7 @@ public class DomainEvents
                 }
             }
             LOG.info(event);
+            recentEvents.record(event, MDC.get("correlation_id"), fields);
         }
         finally
         {
