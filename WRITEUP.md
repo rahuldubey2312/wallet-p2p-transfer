@@ -128,12 +128,22 @@ recollection. That last one mattered: the first draft pinned Spring Boot
 
 **Decided** — AI proposed, I reviewed and accepted: the specific combination of
 ordered `FOR UPDATE` plus conditional debit; claiming the idempotency key first
-within the transaction and reading the replay in a second one; deriving the
-user id as a hash of the bearer token so the credential never lands in logs or
-the database; deriving the replay response from the transfer row rather than
-storing a response body; seeding new wallets with an opening balance;
-Spring Boot's native ECS structured logging instead of a third-party encoder;
-and the Alpine runtime image using BusyBox `wget` for the healthcheck.
+within the transaction and reading the replay in a second one; storing only the
+SHA-256 of an issued token, so the credential is unrecoverable from a database
+dump and never reaches the logs; omitting `last_used_at` from `user_tokens`,
+because stamping it would make a burst sharing one token serialise on that
+row's lock; projecting transaction history from the transfers already recorded
+instead of storing ledger rows twice; deriving the replay response from the
+transfer row rather than storing a response body; seeding new wallets with an
+opening balance; Spring Boot's native ECS structured logging instead of a
+third-party encoder; and the Alpine runtime image using BusyBox `wget` for the
+healthcheck.
+
+I asked for the user entity — real details, a wallet that is attributable to an
+owner, and transaction history — and for tokens to be issued and stored rather
+than chosen by the caller. The shape of that (a foreign key from wallet to
+user, history as a projection, registration writing user and credential in one
+transaction) was proposed to me and I accepted it.
 
 **Caught by testing rather than by reading:** p99 latency was configured but
 never actually published. Enabling `percentiles-histogram` alongside

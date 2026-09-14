@@ -4,7 +4,10 @@ A small wallet service with peer-to-peer transfers, built for the Paytm R2 exerc
 Money is integer paise everywhere: no floats, no rupee decimals, in storage, in
 aggregation, or on the wire.
 
-- **Live URL:** _pending deploy — see [Deploying](#deploying)_
+- **Live URL:** https://wallet-service-1eb9.onrender.com — start at `/` for the
+  endpoint index. On a free instance the first request after 15 idle minutes
+  pays a cold start of up to two minutes; `verify-api.sh` and `burst.sh` both
+  wait for `/health` before measuring anything.
 - **Stack:** Java 21, Spring Boot 4.1.1, PostgreSQL 16, Gradle (Kotlin DSL)
 - **Graded properties:** conservation, no overdraft, exactly-once transfer, race-free get-or-create
 
